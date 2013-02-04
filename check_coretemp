@@ -27,7 +27,7 @@ w_min=0
 cpu='all'
 
 ### MAIN
-kldstat -n coretemp > /dev/null || (echo "coretemp kernel module not loaded" && exit $STATE_UNKNOWN)
+/sbin/kldstat -n coretemp > /dev/null || (echo "coretemp kernel module not loaded" && exit $STATE_UNKNOWN)
 if [ $# -lt 1 ]; then
     print_usage "No arguments passed."
     exit $STATE_UNKNOWN
@@ -79,7 +79,6 @@ then
 fi
 perfdata=""
 perfopts="warn_max=$w_max warn_min=$w_min crit_max=$c_max crit_min=$c_min"
-ncpu=$(sysctl hw.ncpu|awk '{print $2}')
 ncpu=$(sysctl hw.ncpu|awk '{print $2}')
 limit=$((ncpu - 1))
 if [[ "$cpu" == "all" ]]; then
