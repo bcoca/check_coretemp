@@ -32,9 +32,7 @@ if [ $# -lt 1 ]; then
     print_usage "No arguments passed."
     exit $STATE_UNKNOWN
 fi
-
-while [ $# -gt 0 ]
-do
+while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help)
             print_help
@@ -44,21 +42,11 @@ do
             print_revision $PROGNAME $REVISION
             exit $STATE_OK
             ;;
-        -c)
-            c_max="$2"
-            ;;
-        -C)
-            c_min="$2"
-            ;;
-        -w)
-            w_max="$2"
-            ;;
-        -W)
-            w_min="$2"
-            ;;
-        -p)
-            cpu="$2"
-            ;;
+        -c) c_max="$2" ;;
+        -C) c_min="$2" ;;
+        -w) w_max="$2" ;;
+        -W) w_min="$2" ;;
+        -p) cpu="$2" ;;
         *)
             echo "Unknown argument: $1"
             print_usage
