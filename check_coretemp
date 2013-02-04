@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+PROGNAME=$(basename $0)
+PROGPATH=$(dirname $0)
+REVISION="0.1"
+
+. $PROGPATH/utils.sh
+
+print_usage() {
+  echo "Usage:"
+  [ ! -z "$1" ] && echo "$*"
+  echo " $PROGNAME -c <critical_max> -w <warning_max> [-C <critical_min>] [-W <warning_min>] [-p all|<cpucore>]"
+  echo " $PROGNAME -h| --help"
+  echo " $PROGNAME -v| --version"
+}
+
+print_help() {
+    print_revision $PROGNAME $REVISION
+    echo ""
+    print_usage
+    echo ""
+    echo "FreeBSD cpu temperature check for Nagios"
+    echo "minimum default to 0 and cpucore defaults to all"
+}
+
+c_min=0
+w_min=0
+cpu='all'
+
+### MAIN
+kldstat -n coretemp > /dev/null || (echo "coretemp kernel module not loaded" && exit $STATE_UNKNOWN)
+if [ $# -lt 1 ]; then
+    print_usage "No arguments passed."
+    exit $STATE_UNKNOWN
+fi
+
+while [ $# -gt 0 ]
+do
+    case "$1" in
+        -h|--help)
+            print_help
+            exit $STATE_OK
+            ;;
+        -v|--verbose)
+            print_revision $PROGNAME $REVISION
+            exit $STATE_OK
+            ;;
+        -c)
+            c_max="$2"
+            ;;
+        -C)
+            c_min="$2"
+            ;;
+        -w)
+            w_max="$2"
+            ;;
+        -W)
+            w_min="$2"
+            ;;
+        -p)
+            cpu="$2"
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            print_usage
+            exit $STATE_UNKNOWN
+            ;;
+    esac
+    shift 2
+done
+
+if [[ -z $c_max ]] || \
+   [[ -z $w_max ]] || \
+   [[ $w_max -gt $c_max ]] || \
+   [[ $c_min -gt $w_min ]] || \
+   [[ $w_min -gt $w_max ]]
+then
+    print_usage "Critical and Warning max must be set, and values must make relative sense."
+    exit $STATE_UNKNOWN
+fi
+perfdata=""
+perfopts="warn_max=$w_max warn_min=$w_min crit_max=$c_max crit_min=$c_min"
+ncpu=$(sysctl hw.ncpu|awk '{print $2}')
+ncpu=$(sysctl hw.ncpu|awk '{print $2}')
+limit=$((ncpu - 1))
+if [[ "$cpu" == "all" ]]; then
+    avg=0
+    for ((c=0;c<=$limit;c++));do
+        temp=$(sysctl "dev.cpu.${c}.temperature"|sed -e 's|.*: \([0-9.]*\)C|\1|')
+        perfdata="cputemp_${c}=$temp $perfdata"
+        avg=$(echo "${avg} + ${temp}"|bc)
+    done
+    rc=$(echo "${avg} / ${ncpu}"|bc)
+    perfdata="cputemp_avg=$rc $perfdata"
+else
+    temp=$(sysctl "dev.cpu.${cpu}.temperature"|sed -e 's|.*: \([0-9.]*\)C|\1|')
+    perfdata="cputemp_${cpu}=$temp"
+    rc=$( echo "${temp} / 1"|bc )
+fi
+
+msg="OK"
+FINAL=$STATE_OK
+if [[ $rc -ge $c_max ]] || [[ $rc -le $c_min ]]; then
+    msg="CRITICAL"
+    FINAL=$STATE_CRITICAL
+fi
+if [[ $rc -ge $w_max ]] || [[ $rc -le $w_min ]]; then
+    msg="WARNING"
+    FINAL=$STATE_WARNING
+fi
+
+echo "CPU Temperature $msg (${rc}C)|$perfdata $perfopts"
+exit $FINAL
